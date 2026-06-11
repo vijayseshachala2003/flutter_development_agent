@@ -1,0 +1,75 @@
+{
+  "name": "flutter-ollama-agent",
+  "displayName": "Flutter Ollama Agent",
+  "description": "A Flutter-aware local coding agent for VS Code using Ollama.",
+  "version": "0.1.0",
+  "publisher": "local",
+  "engines": {
+    "vscode": "^1.92.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:flutterOllamaAgent.openChat",
+    "onCommand:flutterOllamaAgent.rescanProject"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "flutterOllamaAgent.openChat",
+        "title": "Flutter Ollama Agent: Open Chat"
+      },
+      {
+        "command": "flutterOllamaAgent.rescanProject",
+        "title": "Flutter Ollama Agent: Rescan Project"
+      }
+    ],
+    "configuration": {
+      "title": "Flutter Ollama Agent",
+      "properties": {
+        "flutterOllamaAgent.ollamaUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:11434",
+          "description": "Base URL for your local Ollama server."
+        },
+        "flutterOllamaAgent.model": {
+          "type": "string",
+          "default": "qwen2.5-coder:14b",
+          "description": "Ollama model name to use."
+        },
+        "flutterOllamaAgent.maxContextFiles": {
+          "type": "number",
+          "default": 8,
+          "description": "Maximum number of relevant files injected into each request."
+        },
+        "flutterOllamaAgent.maxFileChars": {
+          "type": "number",
+          "default": 12000,
+          "description": "Maximum characters read from a single context file."
+        },
+        "flutterOllamaAgent.maxAgentSteps": {
+          "type": "number",
+          "default": 8,
+          "description": "Maximum tool-call rounds per user request."
+        },
+        "flutterOllamaAgent.maxSessionTurns": {
+          "type": "number",
+          "default": 6,
+          "description": "Maximum recent user/assistant turns remembered for this workspace. Set to 0 to disable session memory."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "@types/vscode": "^1.92.0",
+    "typescript": "^5.5.4"
+  }
+}
