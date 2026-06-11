@@ -153,6 +153,49 @@ function getToolSchemas() {
     {
       type: "function",
       function: {
+        name: "create_directory",
+        description: "Create a directory inside the workspace. Requires user approval.",
+        parameters: {
+          type: "object",
+          properties: {
+            path: { type: "string" }
+          },
+          required: ["path"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "rename_path",
+        description: "Rename or move a file or directory inside the workspace. Requires user approval and will not overwrite existing destinations.",
+        parameters: {
+          type: "object",
+          properties: {
+            from: { type: "string" },
+            to: { type: "string" }
+          },
+          required: ["from", "to"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "delete_path",
+        description: "Delete a file or directory inside the workspace using trash when available. Requires user approval.",
+        parameters: {
+          type: "object",
+          properties: {
+            path: { type: "string" }
+          },
+          required: ["path"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
         name: "list_directory",
         description: "List files/directories under a relative workspace path.",
         parameters: {

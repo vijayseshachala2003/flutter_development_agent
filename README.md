@@ -19,6 +19,9 @@ A minimal VS Code extension scaffold for a Flutter-aware local coding agent usin
   - `read_many_files`
   - `write_file`
   - `apply_patch`
+  - `create_directory`
+  - `rename_path`
+  - `delete_path`
   - `list_directory`
   - `search_files`
   - `grep`
@@ -60,6 +63,7 @@ The first Cursor-style agent layer is built around search, read, patch, and veri
 - `read_many_files` gathers up to 8 files for coordinated changes.
 - `apply_patch` performs a guarded exact-text replacement in one existing file.
 - `write_file` remains available for new files or intentional whole-file replacement.
+- `create_directory`, `rename_path`, and `delete_path` support guarded workspace file operations.
 - `run_command` verifies changes with approved Flutter, Dart, and Git commands.
 
 For existing files, `apply_patch` is preferred because it requires exactly one matching `old_text` block. If the match is missing or ambiguous, the patch is rejected and the agent must inspect again.
@@ -80,6 +84,9 @@ The extension requires explicit approval before:
 
 - Creating or modifying files with `write_file`.
 - Patching files with `apply_patch`.
+- Creating directories with `create_directory`.
+- Renaming or moving files/directories with `rename_path`.
+- Deleting files/directories with `delete_path`.
 - Running commands with `run_command`.
 
 Approval prompts include the file path or command, the workspace directory, and enough context to decide whether the action is expected.
@@ -94,6 +101,9 @@ Path guardrails:
 - Parent directory traversal is blocked.
 - Writes are blocked for `.git/`, `node_modules/`, `out/`, `build/`, `.dart_tool/`, and lock files.
 - Patches use the same write guardrails as full-file writes.
+- Create, rename, and delete operations use the same path guardrails as writes.
+- Renames do not overwrite existing destinations.
+- Deletes use VS Code's trash-backed file system operation when available.
 - Generated output should be produced by commands such as `npm run compile`, not directly written by the model.
 
 Command guardrails:
@@ -165,13 +175,15 @@ For best results, ask the agent to inspect and explain before editing. Example:
 Inspect the app architecture first. Then propose the exact files needed for login. Do not edit until you explain the plan.
 ```
 
-## Current limitations
+## Remaining upgrade plan
 
 This extension is still not at full Cursor parity. The next major pieces are:
 
-- Visual diff editor approval instead of modal text previews.
-- Active editor and selected-text context.
-- Long-running terminal sessions with cancellation.
-- VS Code Problems integration for automatic fix loops.
-- Rename/delete/create-directory tools with review.
-- Stronger semantic indexing beyond regex and substring search.
+1. Visual diff editor approval instead of modal text previews.
+2. Long-running terminal sessions with cancellation and reusable output history.
+3. VS Code Problems integration for automatic diagnose-fix-rerun loops.
+4. Stronger semantic indexing beyond regex and substring search.
+5. Response streaming from Ollama instead of waiting for full responses.
+6. A richer task plan UI with step statuses and resumable tasks.
+7. Inline editor commands and code actions for selected code.
+8. Git diff/review helpers such as summarize changes and stage selected files.

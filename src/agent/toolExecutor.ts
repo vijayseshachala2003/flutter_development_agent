@@ -43,6 +43,12 @@ export class ToolExecutor {
           requireString(args, "old_text"),
           requireString(args, "new_text")
         );
+      case "create_directory":
+        return this.createDirectory(requireString(args, "path"));
+      case "rename_path":
+        return this.renamePath(requireString(args, "from"), requireString(args, "to"));
+      case "delete_path":
+        return this.deletePath(requireString(args, "path"));
       case "list_directory":
         return this.listDirectory(requireString(args, "path"));
       case "search_files":
@@ -287,6 +293,136 @@ export class ToolExecutor {
       return { ok: true, content: `Patched ${relPath}` };
     } catch (error) {
       return { ok: false, content: `Failed to patch ${relPath}: ${String(error)}` };
+    }
+  }
+
+  private async createDirectory(relPath: string): Promise<ToolResult> {
+    const uri = this.resolveSafe(relPath);
+    if (!uri) {
+      return { ok: false, content: `Blocked unsafe path: ${relPath}` };
+    }
+
+    const pathBlockReason = getBlockedWriteReason(relPath);
+    if (pathBlockReason) {
+      return { ok: false, content: `Blocked directory creation at ${relPath}: ${pathBlockReason}` };
+    }
+
+    const approved = await vscode.window.showWarningMessage(
+      [
+        "Flutter Ollama Agent wants to create this directory:",
+        "",
+        relPath,
+        "",
+        "Review this path before approving."
+      ].join("\n"),
+      { modal: true },
+      "Approve",
+      "Reject"
+    );
+
+    if (approved !== "Approve") {
+      return { ok: false, content: `User rejected create_directory(${relPath}).` };
+    }
+
+    try {
+      await vscode.workspace.fs.createDirectory(uri);
+      return { ok: true, content: `Created directory ${relPath}` };
+    } catch (error) {
+      return { ok: false, content: `Failed to create directory ${relPath}: ${String(error)}` };
+    }
+  }
+
+  private async renamePath(fromRelPath: string, toRelPath: string): Promise<ToolResult> {
+    const fromUri = this.resolveSafe(fromRelPath);
+    const toUri = this.resolveSafe(toRelPath);
+    if (!fromUri || !toUri) {
+      return { ok: false, content: `Blocked unsafe rename path: ${fromRelPath} -> ${toRelPath}` };
+    }
+
+    const fromBlockReason = getBlockedWriteReason(fromRelPath);
+    const toBlockReason = getBlockedWriteReason(toRelPath);
+    if (fromBlockReason) {
+      return { ok: false, content: `Blocked rename from ${fromRelPath}: ${fromBlockReason}` };
+    }
+    if (toBlockReason) {
+      return { ok: false, content: `Blocked rename to ${toRelPath}: ${toBlockReason}` };
+    }
+
+    const sourceStat = await statIfExists(fromUri);
+    if (!sourceStat) {
+      return { ok: false, content: `Cannot rename missing path: ${fromRelPath}` };
+    }
+
+    const destinationStat = await statIfExists(toUri);
+    if (destinationStat) {
+      return { ok: false, content: `Cannot rename because destination already exists: ${toRelPath}` };
+    }
+
+    const approved = await vscode.window.showWarningMessage(
+      [
+        "Flutter Ollama Agent wants to rename/move:",
+        "",
+        `From: ${fromRelPath}`,
+        `To:   ${toRelPath}`,
+        "",
+        "Review both paths before approving."
+      ].join("\n"),
+      { modal: true },
+      "Approve",
+      "Reject"
+    );
+
+    if (approved !== "Approve") {
+      return { ok: false, content: `User rejected rename_path(${fromRelPath}, ${toRelPath}).` };
+    }
+
+    try {
+      await vscode.workspace.fs.rename(fromUri, toUri, { overwrite: false });
+      return { ok: true, content: `Renamed ${fromRelPath} to ${toRelPath}` };
+    } catch (error) {
+      return { ok: false, content: `Failed to rename ${fromRelPath}: ${String(error)}` };
+    }
+  }
+
+  private async deletePath(relPath: string): Promise<ToolResult> {
+    const uri = this.resolveSafe(relPath);
+    if (!uri) {
+      return { ok: false, content: `Blocked unsafe path: ${relPath}` };
+    }
+
+    const pathBlockReason = getBlockedWriteReason(relPath);
+    if (pathBlockReason) {
+      return { ok: false, content: `Blocked delete of ${relPath}: ${pathBlockReason}` };
+    }
+
+    const stat = await statIfExists(uri);
+    if (!stat) {
+      return { ok: false, content: `Cannot delete missing path: ${relPath}` };
+    }
+
+    const kind = stat.type === vscode.FileType.Directory ? "directory" : "file";
+    const approved = await vscode.window.showWarningMessage(
+      [
+        `Flutter Ollama Agent wants to delete this ${kind}:`,
+        "",
+        relPath,
+        "",
+        "This uses VS Code's file system delete operation. Review carefully before approving."
+      ].join("\n"),
+      { modal: true },
+      "Approve",
+      "Reject"
+    );
+
+    if (approved !== "Approve") {
+      return { ok: false, content: `User rejected delete_path(${relPath}).` };
+    }
+
+    try {
+      await vscode.workspace.fs.delete(uri, { recursive: true, useTrash: true });
+      return { ok: true, content: `Deleted ${relPath}` };
+    } catch (error) {
+      return { ok: false, content: `Failed to delete ${relPath}: ${String(error)}` };
     }
   }
 

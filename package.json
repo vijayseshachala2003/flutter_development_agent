@@ -11,6 +11,8 @@
     "Other"
   ],
   "activationEvents": [
+    "workspaceContains:pubspec.yaml",
+    "onLanguage:dart",
     "onCommand:flutterOllamaAgent.openChat",
     "onCommand:flutterOllamaAgent.rescanProject"
   ],

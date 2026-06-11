@@ -35,6 +35,8 @@ export class ContextBuilder {
       "Use apply_patch for existing files whenever possible. Use write_file only when creating a new file or intentionally replacing a whole file.",
       "Before any write_file call, state the exact file path and a concise reason for the change.",
       "Before any apply_patch call, state the exact file path and the behavior you are changing.",
+      "Before create_directory, rename_path, or delete_path, state the exact path or paths and why the file operation is needed.",
+      "Prefer editing over deleting. Delete only when the user's request or a clearly obsolete generated file requires it.",
       "Only edit files that are directly required by the user's request.",
       "Never edit files outside the workspace.",
       "Never bypass approval. Writes and commands are guarded by the host extension.",
