@@ -42,7 +42,7 @@ export class AgentPanel {
     this.panel = panel;
     this.agentLoop = new AgentLoop(rootUri, workspaceState);
 
-    this.panel.webview.html = getHtml();
+    this.panel.webview.html = getHtml(this.panel.webview);
     this.panel.onDidDispose(() => {
       AgentPanel.currentPanel = undefined;
     });
@@ -86,13 +86,15 @@ export class AgentPanel {
   }
 }
 
-function getHtml(): string {
+function getHtml(webview: vscode.Webview): string {
+  const nonce = getNonce();
+
   return /* html */ `
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'; connect-src ${webview.cspSource};" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Flutter Ollama Agent</title>
   <style>
@@ -192,9 +194,9 @@ function getHtml(): string {
 
   <textarea id="prompt" placeholder="Example: Inspect the app architecture. Do not edit yet. Explain routing, state management, and feature folder structure."></textarea>
   <br />
-  <button id="send">Send</button>
-  <button id="rescan">Rescan Project</button>
-  <button id="clearSession">Clear Session</button>
+  <button id="send" type="button">Send</button>
+  <button id="rescan" type="button">Rescan Project</button>
+  <button id="clearSession" type="button">Clear Session</button>
 
   <div class="progressWrap">
     <progress id="progress" max="8" value="0"></progress>
@@ -203,27 +205,34 @@ function getHtml(): string {
 
   <div id="log" class="log"></div>
 
-  <script>
+  <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
-    const promptEl = document.getElementById("prompt");
-    const logEl = document.getElementById("log");
-    const progressEl = document.getElementById("progress");
-    const stepInfoEl = document.getElementById("stepInfo");
+    let promptEl;
+    let logEl;
+    let progressEl;
+    let stepInfoEl;
 
-    document.getElementById("send").addEventListener("click", () => {
-      const text = promptEl.value.trim();
-      if (!text) return;
-      addEntry("You", text);
-      promptEl.value = "";
-      vscode.postMessage({ type: "prompt", text });
-    });
+    window.addEventListener("DOMContentLoaded", () => {
+      promptEl = document.getElementById("prompt");
+      logEl = document.getElementById("log");
+      progressEl = document.getElementById("progress");
+      stepInfoEl = document.getElementById("stepInfo");
 
-    document.getElementById("rescan").addEventListener("click", () => {
-      vscode.postMessage({ type: "rescan" });
-    });
+      bindButton("send", () => {
+        const text = promptEl.value.trim();
+        if (!text) return;
+        addEntry("You", text);
+        promptEl.value = "";
+        vscode.postMessage({ type: "prompt", text });
+      });
 
-    document.getElementById("clearSession").addEventListener("click", () => {
-      vscode.postMessage({ type: "clearSession" });
+      bindButton("rescan", () => {
+        vscode.postMessage({ type: "rescan" });
+      });
+
+      bindButton("clearSession", () => {
+        vscode.postMessage({ type: "clearSession" });
+      });
     });
 
     window.addEventListener("message", (event) => {
@@ -242,7 +251,29 @@ function getHtml(): string {
       if (type === "error") addEntry("Error", text, "error");
     });
 
+    window.addEventListener("error", (event) => {
+      addEntry("Webview Error", event.message || String(event.error), "error");
+    });
+
+    function bindButton(id, handler) {
+      const button = document.getElementById(id);
+      if (!button) {
+        addEntry("Webview Error", "Missing button: " + id, "error");
+        return;
+      }
+
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        try {
+          handler();
+        } catch (error) {
+          addEntry("Webview Error", String(error), "error");
+        }
+      });
+    }
+
     function addEntry(role, text, className = "") {
+      if (!logEl) return;
       const entry = document.createElement("div");
       entry.className = "entry " + className;
 
@@ -251,7 +282,7 @@ function getHtml(): string {
       roleEl.textContent = role;
 
       // Show approval badge for guarded tool calls.
-      if (className === "toolCall" && /\"name\"\s*:\s*\"(write_file|run_command)\"/.test(text)) {
+      if (className === "toolCall" && /\"name\"\s*:\s*\"(write_file|apply_patch|create_directory|rename_path|delete_path|run_command)\"/.test(text)) {
         const badge = document.createElement("span");
         badge.className = "badge";
         badge.textContent = "Requires Approval";
@@ -267,27 +298,36 @@ function getHtml(): string {
       logEl.prepend(entry);
     }
 
-      function updateProgressFromText(text) {
-        if (!text) return;
-        const m = text.match(/step\s*(\\d+)\s*\/\s*(\\d+)/i);
-        if (m) {
-          const cur = parseInt(m[1], 10);
-          const tot = parseInt(m[2], 10);
-          if (progressEl) {
-            progressEl.max = tot;
-            progressEl.value = cur;
-          }
-          if (stepInfoEl) {
-            stepInfoEl.textContent = 'Step ' + cur + '/' + tot;
-          }
-          return;
+    function updateProgressFromText(text) {
+      if (!text) return;
+      const m = text.match(/step\s*(\\d+)\s*\/\s*(\\d+)/i);
+      if (m) {
+        const cur = parseInt(m[1], 10);
+        const tot = parseInt(m[2], 10);
+        if (progressEl) {
+          progressEl.max = tot;
+          progressEl.value = cur;
         }
         if (stepInfoEl) {
-          stepInfoEl.textContent = text.slice(0, 60);
+          stepInfoEl.textContent = 'Step ' + cur + '/' + tot;
         }
+        return;
       }
+      if (stepInfoEl) {
+        stepInfoEl.textContent = text.slice(0, 60);
+      }
+    }
   </script>
 </body>
 </html>
 `;
+}
+
+function getNonce(): string {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let nonce = "";
+  for (let i = 0; i < 32; i++) {
+    nonce += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return nonce;
 }
