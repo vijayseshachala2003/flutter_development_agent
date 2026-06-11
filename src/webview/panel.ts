@@ -48,35 +48,44 @@ export class AgentPanel {
     });
 
     this.panel.webview.onDidReceiveMessage(async (message) => {
-      if (message.type === "prompt") {
-        const prompt = String(message.text ?? "").trim();
-        if (!prompt) {
-          return;
+      try {
+        switch (message.type) {
+          case "ready":
+            this.post("status", "Extension host connected.");
+            return;
+          case "prompt": {
+            const prompt = String(message.text ?? "").trim();
+            if (!prompt) {
+              this.post("status", "Prompt is empty.");
+              return;
+            }
+
+            this.post("status", "Scanning project...");
+            await this.scanner.scan(rootUri);
+
+            const answer = await this.agentLoop.run(
+              prompt,
+              this.scanner.projectMap,
+              (type, text) => this.post(type, text)
+            );
+            this.post("assistant", answer);
+            return;
+          }
+          case "rescan":
+            this.post("status", "Rescanning project...");
+            await this.scanner.scan(rootUri);
+            this.post("status", "Project scan refreshed.");
+            return;
+          case "clearSession":
+            await this.agentLoop.clearSession();
+            this.post("status", "Session memory cleared.");
+            return;
+          default:
+            this.post("error", "Unknown webview message: " + String(message.type));
+            return;
         }
-
-        this.post("status", "Scanning project...");
-        await this.scanner.scan(rootUri);
-
-        try {
-          const answer = await this.agentLoop.run(
-            prompt,
-            this.scanner.projectMap,
-            (type, text) => this.post(type, text)
-          );
-          this.post("assistant", answer);
-        } catch (error) {
-          this.post("error", String(error));
-        }
-      }
-
-      if (message.type === "rescan") {
-        await this.scanner.scan(rootUri);
-        this.post("status", "Project scan refreshed.");
-      }
-
-      if (message.type === "clearSession") {
-        await this.agentLoop.clearSession();
-        this.post("status", "Session memory cleared.");
+      } catch (error) {
+        this.post("error", String(error));
       }
     });
   }
@@ -211,8 +220,11 @@ function getHtml(webview: vscode.Webview): string {
     let logEl;
     let progressEl;
     let stepInfoEl;
+    let initialized = false;
 
     function init() {
+      if (initialized) return;
+      initialized = true;
       promptEl = document.getElementById("prompt");
       logEl = document.getElementById("log");
       progressEl = document.getElementById("progress");
@@ -231,14 +243,17 @@ function getHtml(webview: vscode.Webview): string {
       });
 
       bindButton("rescan", () => {
+        addEntry("You", "Rescan Project");
         vscode.postMessage({ type: "rescan" });
       });
 
       bindButton("clearSession", () => {
+        addEntry("You", "Clear Session");
         vscode.postMessage({ type: "clearSession" });
       });
 
       addEntry("Status", "Webview ready.", "status");
+      vscode.postMessage({ type: "ready" });
     }
 
     if (document.readyState === "loading") {
