@@ -212,11 +212,15 @@ function getHtml(webview: vscode.Webview): string {
     let progressEl;
     let stepInfoEl;
 
-    window.addEventListener("DOMContentLoaded", () => {
+    function init() {
       promptEl = document.getElementById("prompt");
       logEl = document.getElementById("log");
       progressEl = document.getElementById("progress");
       stepInfoEl = document.getElementById("stepInfo");
+
+      if (!promptEl || !logEl || !progressEl || !stepInfoEl) {
+        return;
+      }
 
       bindButton("send", () => {
         const text = promptEl.value.trim();
@@ -233,7 +237,15 @@ function getHtml(webview: vscode.Webview): string {
       bindButton("clearSession", () => {
         vscode.postMessage({ type: "clearSession" });
       });
-    });
+
+      addEntry("Status", "Webview ready.", "status");
+    }
+
+    if (document.readyState === "loading") {
+      window.addEventListener("DOMContentLoaded", init);
+    } else {
+      init();
+    }
 
     window.addEventListener("message", (event) => {
       const { type, text } = event.data;
