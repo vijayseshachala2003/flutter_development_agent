@@ -78,6 +78,21 @@ Explain the selected widget and suggest a cleaner structure.
 Fix the current analyzer errors. Inspect diagnostics first, then patch only the necessary files.
 ```
 
+## Prompt path resolution
+
+Before each model call, the extension deterministically scans the chat prompt for workspace paths and injects confirmed matches into the agent context.
+
+Supported forms:
+
+- Relative files: `lib/main.dart`
+- Relative directories: `lib/features/auth`
+- Current-directory style paths: `./lib/main.dart`
+- Workspace absolute paths: `/Users/name/project/lib/main.dart`
+- File URLs: `file:///Users/name/project/lib/main.dart`
+- Line references: `lib/main.dart:42` or `lib/main.dart:42:7`
+
+Only paths inside the active workspace are accepted. Resolved paths are marked as `file`, `directory`, or `missing` so the agent can list, read, create, patch, rename, or delete the right target through the guarded tools.
+
 ## Permission flow
 
 The extension requires explicit approval before:

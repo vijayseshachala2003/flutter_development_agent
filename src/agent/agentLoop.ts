@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { OllamaClient } from "../ollama/client";
 import { ChatMessage, ProjectMap } from "../types";
 import { ContextBuilder } from "./contextBuilder";
+import { resolvePromptPaths } from "./pathResolver";
 import { ToolExecutor } from "./toolExecutor";
 
 export class AgentLoop {
@@ -32,7 +33,12 @@ export class AgentLoop {
       .getConfiguration("flutterOllamaAgent")
       .get<number>("maxAgentSteps", 8);
 
-    const systemContext = await this.contextBuilder.build(userPrompt, projectMap);
+    const promptPaths = await resolvePromptPaths(this.rootUri, userPrompt);
+    if (promptPaths.length > 0) {
+      onUpdate("status", `Resolved ${promptPaths.length} path(s) from prompt.`);
+    }
+
+    const systemContext = await this.contextBuilder.build(userPrompt, projectMap, promptPaths);
 
     const history = this.loadHistory();
     const messages: ChatMessage[] = [

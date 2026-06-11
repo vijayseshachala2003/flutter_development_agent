@@ -43,6 +43,14 @@ export interface ProjectMap {
   generatedAt: string;
 }
 
+export interface ResolvedPromptPath {
+  raw: string;
+  path: string;
+  kind: "file" | "directory" | "missing";
+  line?: number;
+  character?: number;
+}
+
 export interface ToolResult {
   ok: boolean;
   content: string;

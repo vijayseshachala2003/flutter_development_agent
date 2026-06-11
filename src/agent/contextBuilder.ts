@@ -1,11 +1,15 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import { ProjectMap } from "../types";
+import { ProjectMap, ResolvedPromptPath } from "../types";
 
 export class ContextBuilder {
   constructor(private readonly rootUri: vscode.Uri) {}
 
-  async build(task: string, projectMap: ProjectMap | undefined): Promise<string> {
+  async build(
+    task: string,
+    projectMap: ProjectMap | undefined,
+    promptPaths: ResolvedPromptPath[] = []
+  ): Promise<string> {
     const config = vscode.workspace.getConfiguration("flutterOllamaAgent");
     const maxContextFiles = config.get<number>("maxContextFiles", 8);
     const maxFileChars = config.get<number>("maxFileChars", 12000);
@@ -30,6 +34,7 @@ export class ContextBuilder {
       "Use get_active_editor when the user refers to the current file, open file, cursor position, or active editor.",
       "Use get_selected_text when the user refers to selected code, highlighted code, or this snippet.",
       "Use get_workspace_diagnostics when the user asks to fix errors, warnings, analyzer problems, or current diagnostics.",
+      "When CONFIRMED PROMPT PATHS is present, treat those paths as the user's explicit target before doing broad search.",
       "Use search_files and grep to find relevant code before reading files when the target is uncertain.",
       "Use read_many_files when a task crosses multiple files.",
       "Use apply_patch for existing files whenever possible. Use write_file only when creating a new file or intentionally replacing a whole file.",
@@ -49,6 +54,9 @@ export class ContextBuilder {
       "COMPACT PROJECT MAP",
       compactProjectMap(projectMap),
       "",
+      "CONFIRMED PROMPT PATHS",
+      compactPromptPaths(promptPaths),
+      "",
       "RELEVANT FILE CONTENTS",
       fileBlocks.join("\n\n") || "(No relevant files selected yet.)"
     ].join("\n");
@@ -63,6 +71,19 @@ export class ContextBuilder {
       return "";
     }
   }
+}
+
+function compactPromptPaths(promptPaths: ResolvedPromptPath[]): string {
+  if (promptPaths.length === 0) {
+    return "(No explicit workspace paths resolved from the user prompt.)";
+  }
+
+  return promptPaths
+    .map((item) => {
+      const location = item.line ? `:${item.line}${item.character ? `:${item.character}` : ""}` : "";
+      return `- ${item.path}${location} (${item.kind}; from "${item.raw}")`;
+    })
+    .join("\n");
 }
 
 function compactProjectMap(projectMap: ProjectMap | undefined): string {
